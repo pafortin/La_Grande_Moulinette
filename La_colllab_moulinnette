@@ -62,7 +62,15 @@ def extract_info_from_url_safe(url):
         group_block = group_block_match.group(1)
         groups = re.findall(pattern_text_values, group_block)
 
-    return regions, titles, keywords, companies, schools, groups
+    # Extract years of experience
+    pattern_experience = r'type:YEARS_OF_EXPERIENCE,values:List\((.*?)\)\)'
+    experience_block_match = re.search(pattern_experience, url)
+    experiences = []
+    if experience_block_match:
+        experience_block = experience_block_match.group(1)
+        experiences = re.findall(pattern_text_values, experience_block)
+
+    return regions, titles, keywords, companies, schools, groups, experiences
 
 def extract_potentiel(content):
     """Extract the numeric value from the content."""
@@ -79,6 +87,7 @@ def process_and_save_to_excel_with_headers_safe(input_path, output_path):
         "Current Companies": [],
         "Schools": [],
         "Groups": [],
+        "Years of Experience": [],
         "Potentiel de profils": []
     }
 
@@ -89,7 +98,7 @@ def process_and_save_to_excel_with_headers_safe(input_path, output_path):
             original_url = entry['url']
             potentiel = extract_potentiel(entry['content'])
             converted_url = decode_url(original_url)
-            regions, titles, keywords, companies, schools, groups = extract_info_from_url_safe(converted_url)
+            regions, titles, keywords, companies, schools, groups, experiences = extract_info_from_url_safe(converted_url)
 
             data["Original URL"].append(original_url)
             data["Converted URL"].append(converted_url)
@@ -99,6 +108,7 @@ def process_and_save_to_excel_with_headers_safe(input_path, output_path):
             data["Current Companies"].append(", ".join(companies))
             data["Schools"].append(", ".join(schools))
             data["Groups"].append(", ".join(groups))
+            data["Years of Experience"].append(", ".join(experiences))
             data["Potentiel de profils"].append(potentiel)
 
     df_output = pd.DataFrame(data)
