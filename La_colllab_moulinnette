@@ -1,0 +1,116 @@
+import json
+import re
+import pandas as pd
+import urllib.parse
+from google.colab import files
+
+def decode_url(url):
+    """Decode percent-encoded URL, handling potentially doubly escaped characters."""
+    decoded_url = urllib.parse.unquote(url)
+    fully_decoded_url = urllib.parse.unquote(decoded_url)
+    return fully_decoded_url
+
+def clean_keywords(keywords):
+    """Clean the extracted keywords."""
+    return keywords.rstrip(')')
+
+def extract_info_from_url_safe(url):
+    """Extract specific information from the URL with safety checks."""
+    # Extract regions
+    pattern_region = r'type:REGION,values:List\((.*?)\)\)'
+    region_block_match = re.search(pattern_region, url)
+    regions = []
+    if region_block_match:
+        region_block = region_block_match.group(1)
+        pattern_text_values = r'text:(.*?)(?:,selectionType|text:|$)'
+        regions = re.findall(pattern_text_values, region_block)
+
+    # Extract titles
+    pattern_title = r'type:CURRENT_TITLE,values:List\((.*?)\)\)'
+    title_block_match = re.search(pattern_title, url)
+    titles = []
+    if title_block_match:
+        title_block = title_block_match.group(1)
+        titles = re.findall(pattern_text_values, title_block)
+
+    # Extract keywords
+    pattern_keywords = r'keywords:(.*?)(?:&|$)'
+    keywords_match = re.search(pattern_keywords, url)
+    keywords = clean_keywords(keywords_match.group(1)) if keywords_match else None
+
+    # Extract companies
+    pattern_company = r'type:CURRENT_COMPANY,values:List\((.*?)\)\)'
+    company_block_match = re.search(pattern_company, url)
+    companies = []
+    if company_block_match:
+        company_block = company_block_match.group(1)
+        companies = re.findall(pattern_text_values, company_block)
+
+    # Extract schools
+    pattern_school = r'type:SCHOOL,values:List\((.*?)\)\)'
+    school_block_match = re.search(pattern_school, url)
+    schools = []
+    if school_block_match:
+        school_block = school_block_match.group(1)
+        schools = re.findall(pattern_text_values, school_block)
+
+    # Extract groups
+    pattern_group = r'type:GROUP,values:List\((.*?)\)\)'
+    group_block_match = re.search(pattern_group, url)
+    groups = []
+    if group_block_match:
+        group_block = group_block_match.group(1)
+        groups = re.findall(pattern_text_values, group_block)
+
+    return regions, titles, keywords, companies, schools, groups
+
+def extract_potentiel(content):
+    """Extract the numeric value from the content."""
+    match = re.search(r'(\d+)', content[0])
+    return int(match.group(1)) if match else 0
+
+def process_and_save_to_excel_with_headers_safe(input_path, output_path):
+    data = {
+        "Original URL": [],
+        "Converted URL": [],
+        "Regions": [],
+        "Current Titles": [],
+        "Keywords": [],
+        "Current Companies": [],
+        "Schools": [],
+        "Groups": [],
+        "Potentiel de profils": []
+    }
+
+    # Read the text file and parse each line as JSON
+    with open(input_path, 'r') as file:
+        for line in file:
+            entry = json.loads(line)
+            original_url = entry['url']
+            potentiel = extract_potentiel(entry['content'])
+            converted_url = decode_url(original_url)
+            regions, titles, keywords, companies, schools, groups = extract_info_from_url_safe(converted_url)
+
+            data["Original URL"].append(original_url)
+            data["Converted URL"].append(converted_url)
+            data["Regions"].append(", ".join(regions))
+            data["Current Titles"].append(", ".join(titles))
+            data["Keywords"].append(keywords)
+            data["Current Companies"].append(", ".join(companies))
+            data["Schools"].append(", ".join(schools))
+            data["Groups"].append(", ".join(groups))
+            data["Potentiel de profils"].append(potentiel)
+
+    df_output = pd.DataFrame(data)
+    df_output.to_excel(output_path, index=False)
+
+# Étape 1: Upload du fichier texte
+uploaded = files.upload()
+input_filename = list(uploaded.keys())[0]
+
+# Étape 2: Traitement du fichier uploadé
+output_filename = "tableau_processed_" + input_filename.split('.')[0] + ".xlsx"
+process_and_save_to_excel_with_headers_safe(input_filename, output_filename)
+
+# Étape 3: Téléchargement du fichier traité
+files.download(output_filename)
